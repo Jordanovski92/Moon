@@ -53,18 +53,32 @@
   function updateMoonDirection(lat, lon) {
     const now = new Date();
 
-    // Get moon position
+    // Get moon position and moon times
     const moonPos = SunCalc.getMoonPosition(now, lat, lon);
-    let azimuth = radToDeg(moonPos.azimuth) + 180; // convert range -PI..PI to 0..360 degrees
-    let altitude = radToDeg(moonPos.altitude);
-
-    // Get moonrise and moonset times
     const moonTimes = SunCalc.getMoonTimes(now, lat, lon);
 
-    // Compose info text
-    let infoText = `<strong>Moon Direction:</strong> ${azimuth.toFixed(1)}° (from North)<br>`;
-    infoText += `<strong>Altitude:</strong> ${altitude.toFixed(1)}°<br>`;
+    let azimuth;
+    let infoText = '';
 
+    if (moonPos.altitude > 0) {
+      // Moon is above horizon, show current direction
+      azimuth = radToDeg(moonPos.azimuth) + 180;
+      infoText += `<strong>Moon Direction:</strong> ${azimuth.toFixed(1)}° (from North)<br>`;
+      infoText += `<strong>Altitude:</strong> ${radToDeg(moonPos.altitude).toFixed(1)}°<br>`;
+    } else if (moonTimes.rise) {
+      // Moon below horizon, point to where it will rise
+      const riseAzimuth = SunCalc.getMoonPosition(moonTimes.rise, lat, lon).azimuth;
+      azimuth = radToDeg(riseAzimuth) + 180;
+      infoText += `Moon is currently below horizon.<br>`;
+      infoText += `<strong>Moon will rise at:</strong> ${moonTimes.rise.toLocaleTimeString()}<br>`;
+      infoText += `<strong>Moonrise direction:</strong> ${azimuth.toFixed(1)}° (from North)<br>`;
+    } else {
+      // No moonrise today
+      infoText += `Moon is below horizon and does not rise today.<br>`;
+      azimuth = null; // no direction to show
+    }
+
+    // Show moonrise and moonset times anyway
     if (moonTimes.rise && moonTimes.set) {
       infoText += `<strong>Moonrise:</strong> ${moonTimes.rise.toLocaleTimeString()}<br>`;
       infoText += `<strong>Moonset:</strong> ${moonTimes.set.toLocaleTimeString()}`;
@@ -74,22 +88,25 @@
     } else if (!moonTimes.rise && moonTimes.set) {
       infoText += `Moon does not rise today<br>`;
       infoText += `<strong>Moonset:</strong> ${moonTimes.set.toLocaleTimeString()}`;
-    } else {
-      infoText += `Moon does not rise or set today`;
     }
 
     info.innerHTML = infoText;
 
-    // Calculate endpoint of moon direction line (~2 km)
-    const distance = 0.02; // approx degrees for 2 km (rough)
-    const lat2 = lat + distance * Math.cos(azimuth * Math.PI / 180);
-    const lon2 = lon + distance * Math.sin(azimuth * Math.PI / 180);
+    if (azimuth !== null) {
+      const distance = 0.02;
+      const lat2 = lat + distance * Math.cos(azimuth * Math.PI / 180);
+      const lon2 = lon + distance * Math.sin(azimuth * Math.PI / 180);
 
-    // Update or create the moon direction line on the map
-    if (moonLine) {
-      moonLine.setLatLngs([[lat, lon], [lat2, lon2]]);
+      if (moonLine) {
+        moonLine.setLatLngs([[lat, lon], [lat2, lon2]]);
+      } else {
+        moonLine = L.polyline([[lat, lon], [lat2, lon2]], { color: 'blue', weight: 4 }).addTo(map);
+      }
     } else {
-      moonLine = L.polyline([[lat, lon], [lat2, lon2]], { color: 'blue', weight: 4 }).addTo(map);
+      if (moonLine) {
+        moonLine.remove();
+        moonLine = null;
+      }
     }
   }
 
