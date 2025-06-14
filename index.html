@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Moon Direction Finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+  #info {
+    position: absolute;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px 14px;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    max-width: 90%;
+    border-radius: 8px;
+    font-family: sans-serif;
+    font-size: 1rem;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+  </style>
+
+</head>
+<body>
+  <div id="info">Loading location and moon direction...</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/suncalc/suncalc.js"></script>
+  <script>
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      const map = L.map('map').setView([lat, lon], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const moonPos = SunCalc.getMoonPosition(new Date(), lat, lon);
+      const azimuthDeg = (moonPos.azimuth * 180 / Math.PI + 180).toFixed(2);
+
+      const info = document.getElementById('info');
+      info.innerHTML = `Moon direction: ${azimuthDeg}° from North`;
+
+      const moonIcon = L.divIcon({
+        html: '🌓',
+        className: '',
+        iconSize: [24, 24],
+      });
+
+      const moonLatLng = L.latLng(
+        lat + 0.01 * Math.cos(moonPos.azimuth),
+        lon + 0.01 * Math.sin(moonPos.azimuth)
+      );
+
+      L.marker([lat, lon]).addTo(map).bindPopup("You are here").openPopup();
+
+      L.polyline([[lat, lon], moonLatLng], { color: 'blue', weight: 3 }).addTo(map);
+      L.marker(moonLatLng, { icon: moonIcon }).addTo(map);
+
+    }, err => {
+      document.getElementById('info').innerText = 'Failed to get location.';
+      console.error(err);
+    });
+  </script>
+<small style="position: absolute; bottom: 5px; left: 5px; background: rgba(255,255,255,0.6); padding: 4px;">
+  Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>
+</small>
+</body>
+</html>
